@@ -1,0 +1,13 @@
+# Java
+/target/
+/build/
+
+# Node
+/node_modules/
+
+# Android
+.gradle/
+local.properties
+
+# Mac
+.DS_Store
