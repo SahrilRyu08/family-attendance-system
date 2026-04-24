@@ -1,259 +1,375 @@
 package com.example.family_attendence_app.ui.screen
 
-import androidx.compose.foundation.background
+import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.family_attendence_app.ui.theme.PrimaryGreen
-import com.example.family_attendence_app.ui.theme.SecondaryOrange
-import com.example.family_attendence_app.ui.util.UiState
-import com.example.family_attendence_app.ui.viewmodel.CheckInViewModel
-
+import com.example.family_attendence_app.data.model.Event
+import com.example.family_attendence_app.data.model.Peserta
+import com.example.family_attendence_app.ui.viewmodel.AttendanceViewModel
+import com.example.family_attendence_app.ui.viewmodel.UiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManualInputScreen(
-    viewModel: CheckInViewModel = viewModel(),
-    eventId: Long,
+    vm: AttendanceViewModel,
     onBack: () -> Unit,
-    onSuccess: () -> Unit
+    onSuccess: (nama: String) -> Unit
 ) {
-    var namaLengkap by remember { mutableStateOf("") }
-    var kodeKeluarga by remember { mutableStateOf("") }
-    val checkInState by viewModel.checkInState.collectAsStateWithLifecycle()
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val eventState by vm.event.collectAsState()
+    val checkinState by vm.checkinState.collectAsState()
+    val searchResult by vm.searchResult.collectAsState()
+    val selectedPeserta by vm.selectedPeserta.collectAsState()
+    val query by vm.searchQuery.collectAsState()
+
+    val focus = LocalFocusManager.current
+    val snackbar = remember { SnackbarHostState() }
+
+    var catatan by remember { mutableStateOf("") }
+    var showConfirmDialog by remember { mutableStateOf(false) }
+
+    val event = (eventState as? UiState.Success<Event>)?.data
+
+    LaunchedEffect(Unit) { vm.startSearchDebounce() }
+
+    LaunchedEffect(checkinState) {
+        when (val s = checkinState) {
+            is UiState.Success -> {
+                val nama = selectedPeserta?.nama ?: ""
+                vm.clearSearch()
+                vm.resetCheckin()
+                onSuccess(nama)
+            }
+
+            is UiState.Error -> {
+                snackbar.showSnackbar(s.msg)
+                vm.resetCheckin()
+            }
+
+            else -> Unit
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Input Manual", fontWeight = FontWeight.Bold) },
+                title = { Text("Input Manual") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
+                    IconButton(onClick = { vm.clearSearch(); onBack() }) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Kembali")
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbar) },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
+
         Column(
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header Info
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Reuni Keluarga Besar",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                    Text(
-                        text = "Sabtu, 12 Juli 2025 · Aula Serbaguna",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
 
-            // Form Fields
-            OutlinedTextField(
-                value = namaLengkap,
-                onValueChange = {
-                    namaLengkap = it
-                    errorMessage = null
-                },
-                label = { Text("Nama Lengkap") },
-                placeholder = { Text("Contoh: Ibu Siti Rahayu") },
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = PrimaryGreen,
-                    focusedLabelColor = PrimaryGreen
-                )
-            )
-
-            OutlinedTextField(
-                value = kodeKeluarga,
-                onValueChange = { kodeKeluarga = it },
-                label = { Text("No. Anggota / Kode Keluarga") },
-                placeholder = { Text("Contoh: KLG-042") },
-                leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = PrimaryGreen,
-                    focusedLabelColor = PrimaryGreen
-                )
-            )
-
-            OutlinedTextField(
-                value = "Reuni Keluarga 2025",
-                onValueChange = { },
-                label = { Text("Acara") },
-                enabled = false,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    disabledBorderColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            )
-
-            // Error Message
-            errorMessage?.let { error ->
+            // ── Info event ─────────────────────────────
+            event?.let {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
+                    colors = CardDefaults.cardColors(MaterialTheme.colorScheme.primaryContainer)
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            Icons.Default.ErrorOutline,
+                            imageVector = Icons.Outlined.Event,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = error,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            fontSize = 14.sp
-                        )
+                        Column {
+                            Text(
+                                text = it.nama,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = it.tanggal,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            // ── Search ─────────────────────────────
+            Text(
+                text = "Cari Nama Peserta",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
 
-            // Submit Button
-            Button(
-                onClick = {
-                    when {
-                        namaLengkap.isBlank() -> {
-                            errorMessage = "Nama lengkap harus diisi"
-                        }
-                        namaLengkap.length < 3 -> {
-                            errorMessage = "Nama minimal 3 karakter"
-                        }
-                        else -> {
-                            viewModel.submitCheckIn(namaLengkap)
+            OutlinedTextField(
+                value = query,
+                onValueChange = { vm.searchQuery.value = it },
+                label = { Text("Ketik nama peserta...") },
+                leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                trailingIcon = {
+                    AnimatedVisibility(visible = query.isNotEmpty()) {
+                        IconButton(onClick = { vm.clearSearch() }) {
+                            Icon(Icons.Outlined.Clear, null)
                         }
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryGreen
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Words,
+                    imeAction = ImeAction.Search
                 ),
-                enabled = checkInState !is UiState.Loading
-            ) {
-                if (checkInState is UiState.Loading) {
-                    CircularProgressIndicator(
-                        color = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
+                keyboardActions = KeyboardActions {
+                    focus.clearFocus()
+                }
+            )
+
+            // ── Result ─────────────────────────────
+            when (searchResult) {
+
+                is UiState.Loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    }
+                }
+
+                is UiState.Success -> {
+                    val list = (searchResult as UiState.Success<List<Peserta>>).data
+
+                    if (list.isEmpty()) {
+                        Text(
+                            text = "Tidak ada peserta \"$query\"",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+
+                            list.forEach { peserta ->
+                                val isSelected = selectedPeserta?.id == peserta.id
+
+                                Card(
+                                    onClick = {
+                                        vm.selectPeserta(if (isSelected) null else peserta)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        if (isSelected)
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        else
+                                            MaterialTheme.colorScheme.surface
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+
+                                        Surface(
+                                            modifier = Modifier.size(40.dp),
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = if (isSelected)
+                                                MaterialTheme.colorScheme.primary
+                                            else
+                                                MaterialTheme.colorScheme.primaryContainer
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = peserta.nama.take(2).uppercase(),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isSelected)
+                                                        MaterialTheme.colorScheme.onPrimary
+                                                    else
+                                                        MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = peserta.nama,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Text(
+                                                text = peserta.kodeKeluarga ?: "-",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.CheckCircle,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                is UiState.Error -> {
                     Text(
-                        "Konfirmasi Hadir",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                        text = (searchResult as UiState.Error).msg,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
-            }
 
-            // Info Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = SecondaryOrange.copy(alpha = 0.1f)
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Info,
-                        contentDescription = null,
-                        tint = SecondaryOrange,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column {
+                else -> {
+                    if (query.length == 1) {
                         Text(
-                            text = "Untuk Orang Tua / Lansia",
-                            fontWeight = FontWeight.SemiBold,
-                            color = SecondaryOrange
-                        )
-                        Text(
-                            text = "Input manual tanpa perlu scan QR code",
-                            fontSize = 13.sp,
-                            color = SecondaryOrange.copy(alpha = 0.8f)
+                            text = "Ketik minimal 2 huruf",
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
             }
+
+            // ── Selected ─────────────────────────────
+            AnimatedVisibility(visible = selectedPeserta != null) {
+
+                selectedPeserta?.let { p ->
+
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+                        HorizontalDivider()
+
+                        Text("Peserta Terpilih", fontWeight = FontWeight.SemiBold)
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(MaterialTheme.colorScheme.primaryContainer)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+
+                                Surface(
+                                    modifier = Modifier.size(44.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.primary
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = p.nama.take(2).uppercase(),
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    }
+                                }
+
+                                Column {
+                                    Text(p.nama, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        text = p.kodeKeluarga ?: "-",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = catatan,
+                            onValueChange = { catatan = it },
+                            label = { Text("Catatan (opsional)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Button(
+                            onClick = { showConfirmDialog = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Konfirmasi Kehadiran")
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 
-    // Handle Check-in Result
-    LaunchedEffect(checkInState) {
-        when (checkInState) {
-            is UiState.Success -> {
-                onSuccess()
-            }
-            is UiState.Error -> {
-                val error = (checkInState as UiState.Error).message
-                errorMessage = when {
-                    error.contains("tidak terdaftar", ignoreCase = true) ->
-                        "Nama tidak ditemukan di database"
-                    error.contains("sudah check-in", ignoreCase = true) ->
-                        "Peserta sudah check-in sebelumnya"
-                    else -> error
+
+    // ── Dialog konfirmasi ─────────────────────────────────────────────────
+    if (showConfirmDialog && selectedPeserta != null && event != null) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDialog = false },
+            icon    = { Icon(Icons.Outlined.HowToReg, null,
+                tint = MaterialTheme.colorScheme.primary) },
+            title   = { Text("Konfirmasi Kehadiran") },
+            text    = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Daftarkan kehadiran:")
+                    Text(selectedPeserta!!.nama,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.primary)
+                    Text("di acara: ${event.nama}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                viewModel.resetCheckInState()
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showConfirmDialog = false
+                        vm.doCheckin(
+                            selectedPeserta!!.id,
+                            event.id,
+                            catatan.ifBlank { null }
+                        )
+                    }
+                ) { Text("Ya, Konfirmasi") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDialog = false }) { Text("Batal") }
             }
-            else -> {}
-        }
+        )
     }
 }

@@ -1,395 +1,324 @@
 package com.example.family_attendence_app.ui.screen
 
-import androidx.compose.foundation.background
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.family_attendence_app.network.models.ParticipantDto
-import com.example.family_attendence_app.ui.theme.PrimaryGreen
-import com.example.family_attendence_app.ui.theme.SecondaryOrange
-import com.example.family_attendence_app.ui.util.UiState
-import com.example.family_attendence_app.ui.viewmodel.ReportViewModel
+import com.example.family_attendence_app.data.model.Event
+import com.example.family_attendence_app.data.model.ReportData
+import com.example.family_attendence_app.data.model.ReportItem
+import com.example.family_attendence_app.data.model.TotalData
+import com.example.family_attendence_app.ui.viewmodel.AttendanceViewModel
+import com.example.family_attendence_app.ui.viewmodel.UiState
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun ReportScreen(
-    viewModel: ReportViewModel = viewModel(),
-    onBack: () -> Unit,
-    onCheckInClick: () -> Unit
+    vm: AttendanceViewModel,
+    onBack: () -> Unit
 ) {
-    val reportState by viewModel.reportState.collectAsStateWithLifecycle()
-    val statsState by viewModel.statsState.collectAsStateWithLifecycle()
-    val filterStatus by viewModel.filterStatus.collectAsStateWithLifecycle()
+    val eventState  by vm.event.collectAsState()
+    val reportState by vm.report.collectAsState()
+    val filterState by vm.reportFilter.collectAsState()
+    val totalState by vm.total.collectAsState()
 
-    var showFilterMenu by remember { mutableStateOf(false) }
+    val event = (eventState as? UiState.Success<Event>)?.data
+
+    // Load report
+    LaunchedEffect(event) {
+        event?.let { vm.loadReport(it.id, null) }
+    }
+
+    val filters = listOf(
+        null to "Semua",
+        "present" to "Hadir",
+        "belumhadir" to "Belum Hadir"
+    )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        "Rekap Kehadiran",
-                        fontWeight = FontWeight.Bold
-                    )
-                },
+                title = { Text("Laporan Kehadiran") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Kembali")
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    IconButton(
+                        onClick = { event?.let { vm.loadReport(it.id, filterState) } }
+                    ) {
+                        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh")
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                }
             )
         },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onCheckInClick,
-                containerColor = PrimaryGreen,
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(Icons.Default.PersonAdd, contentDescription = "Check-In", tint = Color.White)
-            }
-        }
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            // Stats Cards
-            when (statsState) {
-                is UiState.Success -> {
-                    val stats = (statsState as UiState.Success).data
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        StatCardModern(
-                            title = "Hadir",
-                            value = stats.hadir.toString(),
-                            backgroundColor = PrimaryGreen.copy(alpha = 0.15f),
-                            textColor = PrimaryGreen,
-                            modifier = Modifier.weight(1f)
-                        )
-                        StatCardModern(
-                            title = "Belum",
-                            value = stats.belumHadir.toString(),
-                            backgroundColor = Color(0xFFE74C3C).copy(alpha = 0.15f),
-                            textColor = Color(0xFFE74C3C),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-                else -> {
-                    // Loading skeleton
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        repeat(2) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(80.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                            )
-                        }
-                    }
-                }
-            }
 
-            // Progress Bar
-            when (statsState) {
-                is UiState.Success -> {
-                    val stats = (statsState as UiState.Success).data
-                    val total = stats.total.toFloat()
-                    val hadirPercent = if (total > 0) (stats.hadir / total) else 0f
+        when (reportState) {
 
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        LinearProgressIndicator(
-                            progress = hadirPercent,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp)),
-                            color = PrimaryGreen,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                        Spacer(Modifier.height(8.dp))
+            // ================= LOADING =================
+            is UiState.Loading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator()
                         Text(
-                            text = "${(hadirPercent * 100).toInt()}% kehadiran",
-                            fontSize = 12.sp,
+                            "Memuat data...",
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
+            }
 
-                else -> {
-                    null
+            // ================= ERROR =================
+            is UiState.Error -> {
+                val msg = (reportState as UiState.Error).msg
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.ErrorOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+
+                        Text(msg, color = MaterialTheme.colorScheme.error)
+
+                        Button(
+                            onClick = { event?.let { vm.loadReport(it.id, filterState) } }
+                        ) {
+                            Text("Coba Lagi")
+                        }
+                    }
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            // ================= SUCCESS =================
+            is UiState.Success -> {
 
-            // Filter Section
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Filter:",
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                val data = (reportState as UiState.Success<ReportData>).data
+                val total = (totalState as UiState.Success<TotalData>).data
 
-                Box {
-                    FilterChip(
-                        selected = false,
-                        onClick = { showFilterMenu = true },
-                        label = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    when (filterStatus) {
-                                        "Hadir" -> "Hadir"
-                                        "Belum Hadir" -> "Belum Hadir"
-                                        else -> "Semua"
-                                    }
-                                )
-                                Icon(
-                                    Icons.Default.KeyboardArrowDown,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+
+                    // ===== STAT =====
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ReportStatCard(
+                                value = "${total.totalHadir}",
+                                label = "Hadir",
+                                color = MaterialTheme.colorScheme.primary,
+                                bg = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                            ReportStatCard(
+                                value = "${total.totalBelum}",
+                                label = "Belum",
+                                color = MaterialTheme.colorScheme.error,
+                                bg = MaterialTheme.colorScheme.errorContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                            ReportStatCard(
+                                value = "${total.totalPeserta}",
+                                label = "Total",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                bg = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    // ===== PROGRESS =====
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Progres Kehadiran")
+                                    Text("${total.persenHadir}%")
+                                }
+
+                                LinearProgressIndicator(
+                                    progress = {
+                                        if (total.totalPeserta == 0L) 0f
+                                        else total.totalHadir.toFloat() / total.totalPeserta
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(10.dp),
+                                    strokeCap = StrokeCap.Round
                                 )
                             }
                         }
-                    )
+                    }
 
-                    DropdownMenu(
-                        expanded = showFilterMenu,
-                        onDismissRequest = { showFilterMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Semua") },
-                            onClick = {
-                                viewModel.updateFilter(null)
-                                showFilterMenu = false
+                    // ===== FILTER =====
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            filters.forEach { (value, label) ->
+                                FilterChip(
+                                    selected = filterState == value,
+                                    onClick = { event?.let { vm.loadReport(it.id, value) } },
+                                    label = { Text(label) }
+                                )
                             }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Hadir") },
-                            onClick = {
-                                viewModel.updateFilter("Hadir")
-                                showFilterMenu = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Belum Hadir") },
-                            onClick = {
-                                viewModel.updateFilter("Belum Hadir")
-                                showFilterMenu = false
-                            }
+                        }
+                    }
+
+                    // ===== HEADER =====
+                    item {
+                        Text(
+                            when (filterState) {
+                                "present" -> "Daftar Hadir (${data.list.size})"
+                                "belumhadir" -> "Belum Hadir (${data.list.size})"
+                                else -> "Semua Peserta (${data.list.size})"
+                            },
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
-                }
-            }
 
-            Spacer(Modifier.height(12.dp))
-
-            // Participant List
-            when (reportState) {
-                is UiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.align(Alignment.Center),
-                            color = PrimaryGreen
-                        )
-                    }
-                }
-                is UiState.Error -> {
-                    ErrorMessageView((reportState as UiState.Error).message) {
-                        viewModel.loadReport()
-                    }
-                }
-                is UiState.Success -> {
-                    val participants = (reportState as UiState.Success).data
-                    if (participants.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            Column(
-                                modifier = Modifier.align(Alignment.Center),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                    // ===== LIST =====
+                    if (data.list.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    Icons.Default.PersonOff,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(48.dp)
-                                )
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    text = "Belum ada data peserta",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Text("Tidak ada data")
                             }
                         }
                     } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(participants, key = { it.id }) { participant ->
-                                ParticipantCardModern(participant)
-                            }
-
-                            // Export Button
-                            item {
-                                Spacer(Modifier.height(12.dp))
-                                OutlinedButton(
-                                    onClick = { /* Export Excel/PDF */ },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(50.dp),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = PrimaryGreen
-                                    ),
-                                    border = ButtonDefaults.outlinedButtonBorder.copy(
-                                        brush = androidx.compose.ui.graphics.SolidColor(PrimaryGreen)
-                                    )
-                                ) {
-                                    Icon(
-                                        Icons.Default.FileDownload,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        "Export Excel / PDF",
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                                Spacer(Modifier.height(16.dp))
-                            }
+                        items(
+                            items = data.list,
+                            key = { it.peserta.id ?: it.hashCode() } // SAFE
+                        ) { item ->
+                            ReportItemCard(item)
                         }
                     }
                 }
             }
+
+            else -> Unit
         }
     }
 }
 
 @Composable
-private fun StatCardModern(
-    title: String,
+private fun ReportStatCard(
     value: String,
-    backgroundColor: Color,
-    textColor: Color,
-    modifier: Modifier = Modifier
+    label: String,
+    color: androidx.compose.ui.graphics.Color,
+    bg: androidx.compose.ui.graphics.Color,
+    modifier: Modifier
 ) {
     Card(
-        modifier = modifier.height(80.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor)
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = bg)
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center
+                .padding(12.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = value,
-                fontWeight = FontWeight.Bold,
-                fontSize = 28.sp,
-                color = textColor
-            )
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                color = textColor.copy(alpha = 0.8f)
-            )
+            Text(value, fontWeight = FontWeight.Bold, color = color)
+            Text(label, color = color.copy(0.7f))
         }
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
-private fun ParticipantCardModern(
-    participant: ParticipantDto
-) {
+private fun ReportItemCard(item: ReportItem) {
+    val isHadir = item.status == "HADIR"
+    val accent = if (isHadir) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    val accentBg = if (isHadir) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer
+    val formatter = DateTimeFormatter.ofPattern("HH:mm")
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = participant.name,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "#${participant.id}",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
 
             Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (participant.status == "Hadir")
-                    PrimaryGreen.copy(alpha = 0.15f)
-                else
-                    SecondaryOrange.copy(alpha = 0.15f)
+                modifier = Modifier.size(42.dp),
+                shape = RoundedCornerShape(10.dp),
+                color = accentBg
             ) {
-                Text(
-                    text = if (participant.status == "Hadir") "QR" else "Manual",
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (participant.status == "Hadir")
-                        PrimaryGreen
-                    else
-                        SecondaryOrange
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Text(item.peserta.nama.take(2).uppercase(), color = accent)
+                }
+            }
+
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(item.peserta.nama, fontWeight = FontWeight.SemiBold)
+                Text(item.peserta.kodeKeluarga ?: "-")
+            }
+
+            Column(horizontalAlignment = Alignment.End) {
+                Text(if (isHadir) "HADIR" else "BELUM", color = accent)
+
+                if (isHadir && item.waktuCheckin != null) {
+                    Text(item.waktuCheckin.format(formatter))
+                }
             }
         }
     }

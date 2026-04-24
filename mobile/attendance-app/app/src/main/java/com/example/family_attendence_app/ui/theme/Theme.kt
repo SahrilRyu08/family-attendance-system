@@ -1,48 +1,43 @@
 package com.example.family_attendence_app.ui.theme
 
-import android.app.Activity
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryGreen,
-    secondary = SecondaryOrange,
-    tertiary = PrimaryGreenLight,
-    background = DarkBackground,
-    surface = DarkSurface,
-    surfaceVariant = DarkSurfaceVariant,
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onBackground = TextPrimary,
-    onSurface = TextPrimary,
-    onSurfaceVariant = TextSecondary
+val Teal600  = Color(0xFF0D9488)
+val Teal100  = Color(0xFFE1F5EE)
+val Amber600 = Color(0xFFBA7517)
+val Amber100 = Color(0xFFFAEEDA)
+val Navy     = Color(0xFF1A2E4A)
+
+private val Light = lightColorScheme(
+    primary             = Teal600,
+    onPrimary           = Color.White,
+    primaryContainer    = Teal100,
+    onPrimaryContainer  = Color(0xFF085041),
+    secondary           = Amber600,
+    onSecondary         = Color.White,
+    secondaryContainer  = Amber100,
+    onSecondaryContainer= Color(0xFF633806),
+    background          = Color(0xFFF6FAF9),
+    surface             = Color.White,
+    onBackground        = Navy,
+    onSurface           = Navy,
+    surfaceVariant      = Color(0xFFEFF6F4),
+    onSurfaceVariant    = Color(0xFF4A6360),
+    error               = Color(0xFFA32D2D),
+    errorContainer      = Color(0xFFFCEBEB),
+    outline             = Color(0xFFB2CECA)
 )
 
 @Composable
 fun FamilyAttendanceTheme(
-    darkTheme: Boolean = true,
+    dark: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = DarkColorScheme
-    val view = LocalView.current
-
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = DarkBackground.toArgb()
-            WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = false
-            }
-        }
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography(),
-        content = content
+        colorScheme = Light,
+        content     = content
     )
 }
