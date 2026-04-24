@@ -1,0 +1,109 @@
+### Base URL
+@baseUrl = http://localhost:8080
+
+########################################
+### EVENT
+########################################
+
+### Get semua event
+GET {{baseUrl}}/api/event
+Accept: application/json
+
+###
+
+### Get event aktif
+GET {{baseUrl}}/api/event/active
+Accept: application/json
+
+###
+
+### Get event by ID
+GET {{baseUrl}}/api/event/1
+Accept: application/json
+
+###
+
+### Create event
+POST {{baseUrl}}/api/event
+Content-Type: application/json
+
+{
+  "name": "Event Testing",
+  "location": "Bandung",
+  "date": "2026-04-24",
+  "nama": "",
+  "tanggal": "",
+  "lokasi": "",
+  "isActive": false
+}
+
+###
+
+### Activate event
+PATCH {{baseUrl}}/api/event/1/activate
+Accept: application/json
+
+###
+
+########################################
+### CHECKIN / DAFTAR
+########################################
+
+### Checkin peserta
+POST {{baseUrl}}/api/checkin
+Content-Type: application/json
+
+{
+  "name": "Sahril Saepuloh",
+  "eventId": 1,
+  "pesertaId": 1
+}
+
+###
+
+### Alias daftar (checkin juga)
+POST {{baseUrl}}/api/daftar
+Content-Type: application/json
+
+{
+  "name": "Budi Santoso",
+  "eventId": 1,
+  "pesertaId": 1
+}
+
+###
+
+########################################
+### SEARCH
+########################################
+
+### Cari peserta by nama
+GET {{baseUrl}}/api/search/rini
+Accept: application/json
+
+###
+
+########################################
+### LIST PESERTA
+########################################
+
+### List hadir
+GET {{baseUrl}}/api/list?eventId=1&filter=present
+Accept: application/json
+
+###
+
+### List belum hadir
+GET {{baseUrl}}/api/list?eventId=1&filter=belumhadir
+Accept: application/json
+
+###
+
+########################################
+### TOTAL & PERSENTASE
+########################################
+
+### Total + persentase hadir
+GET {{baseUrl}}/api/total?eventId=1
+Accept: application/json
+###
